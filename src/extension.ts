@@ -108,28 +108,26 @@ async function createWindow() {
 
   assert(globalConfig.jjuiPath, "jjui path is undefined!");
 
-  // 1. Create the terminal
+  // Define the arguments for the shell to execute jjui and then exit
+  // On Linux/Mac: bash -c "jjui"
+  // On Windows: powershell.exe -Command "jjui"
+  const isWin = process.platform === "win32";
+  const shellArgs = isWin 
+    ? ["-Command", `${globalConfig.jjuiPath}; exit`] 
+    : ["-c", `${globalConfig.jjuiPath} && exit`];
+
   jjuiTerminal = vscode.window.createTerminal({
     name: "jjui",
     cwd: workspaceFolder,
     location: vscode.TerminalLocation.Editor,
+    // We launch the shell specifically to run jjui as its primary process
+    shellPath: isWin ? "powershell.exe" : "/bin/bash",
+    shellArgs: shellArgs,
   });
 
-  // 2. Send the command immediately
-  const exitSuffix = process.platform === "win32" ? "; exit" : " && exit";
-  jjuiTerminal.sendText(`${globalConfig.jjuiPath}${exitSuffix}`);
-
-  // 3. Show and Focus (The "false" argument tells VS Code to take focus)
+  // Because the terminal IS the process now, show(false) 
+  // will focus it immediately and correctly.
   jjuiTerminal.show(false);
-
-  // 4. Force a re-focus after a short delay to fix the "first-time" focus bug
-  setTimeout(() => {
-    if (jjuiTerminal) {
-        jjuiTerminal.show(false);
-        // Specifically trigger the workbench focus to ensure keyboard input hooks in
-        vscode.commands.executeCommand("workbench.action.terminal.focus");
-    }
-  }, 100); // 100ms is usually enough to let the UI catch up
 
   vscode.window.onDidCloseTerminal((terminal) => {
     if (terminal === jjuiTerminal) {
