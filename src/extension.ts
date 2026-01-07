@@ -127,9 +127,6 @@ async function createWindow() {
   // Attempt to focus immediately
   jjuiTerminal.show(false);
 
-  // The "First-Open" Fix:
-  // Poll for focus. This is cleaner than a fixed delay because it
-  // resolves as fast as the hardware allows (usually < 50ms).
   let focusAttempts = 0;
   const pollFocus = () => {
     if (vscode.window.activeTerminal === jjuiTerminal) {
@@ -244,9 +241,26 @@ function expandPath(pth: string): string {
 }
 
 function getWorkspaceFolder(): string {
-  const activeDocumentUri = vscode.window.activeTextEditor?.document.uri;
-  const workspaceFolder = activeDocumentUri
-    ? vscode.workspace.getWorkspaceFolder(activeDocumentUri)
-    : vscode.workspace.workspaceFolders?.[0];
-  return workspaceFolder?.uri.fsPath ?? os.homedir();
+  // 1. Try to get URI from a standard text editor OR a Jupyter Notebook editor
+  const activeEditorUri =
+    vscode.window.activeTextEditor?.document.uri ||
+    vscode.window.activeNotebookEditor?.notebook.uri;
+
+  if (activeEditorUri) {
+    const folder = vscode.workspace.getWorkspaceFolder(activeEditorUri);
+    if (folder) return folder.uri.fsPath;
+  }
+
+  // 2. Fallback: Search all open workspace folders for the first one containing .jj
+  const folders = vscode.workspace.workspaceFolders;
+  if (folders) {
+    for (const folder of folders) {
+      if (fs.existsSync(path.join(folder.uri.fsPath, ".jj"))) {
+        return folder.uri.fsPath;
+      }
+    }
+    return folders[0].uri.fsPath;
+  }
+
+  return os.homedir();
 }
