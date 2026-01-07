@@ -62,9 +62,12 @@ async function loadExtension() {
   if (globalConfig.jjuiPath) {
     globalConfig.jjuiPath = expandPath(globalConfig.jjuiPath);
   } else {
-    try { globalConfig.jjuiPath = await findExecutableOnPath("jjui");
+    try {
+      globalConfig.jjuiPath = await findExecutableOnPath("jjui");
     } catch (error) {
-      vscode.window.showErrorMessage("jjui not found on PATH. Please install it or set jjuiPath.");
+      vscode.window.showErrorMessage(
+        "jjui not found on PATH. Please install it or set jjuiPath.",
+      );
     }
   }
 }
@@ -90,7 +93,11 @@ export async function activate(context: vscode.ExtensionContext) {
   }
 
   const updateFocusContext = () => {
-    vscode.commands.executeCommand("setContext", JJUI_CONTEXT_KEY, windowFocused());
+    vscode.commands.executeCommand(
+      "setContext",
+      JJUI_CONTEXT_KEY,
+      windowFocused(),
+    );
   };
 
   context.subscriptions.push(
@@ -105,32 +112,42 @@ export async function activate(context: vscode.ExtensionContext) {
 async function createWindow() {
   await reloadIfConfigChange();
   const workspaceFolder = getWorkspaceFolder();
-
-  assert(globalConfig.jjuiPath, "jjui path is undefined!");
-
-  // Define the arguments for the shell to execute jjui and then exit
-  // On Linux/Mac: bash -c "jjui"
-  // On Windows: powershell.exe -Command "jjui"
   const isWin = process.platform === "win32";
-  const shellArgs = isWin 
-    ? ["-Command", `${globalConfig.jjuiPath}; exit`] 
-    : ["-c", `${globalConfig.jjuiPath} && exit`];
 
   jjuiTerminal = vscode.window.createTerminal({
     name: "jjui",
     cwd: workspaceFolder,
     location: vscode.TerminalLocation.Editor,
-    // We launch the shell specifically to run jjui as its primary process
     shellPath: isWin ? "powershell.exe" : "/bin/bash",
-    shellArgs: shellArgs,
+    shellArgs: isWin
+      ? ["-Command", `${globalConfig.jjuiPath}; exit`]
+      : ["-c", `${globalConfig.jjuiPath} && exit`],
   });
 
-  // Because the terminal IS the process now, show(false) 
-  // will focus it immediately and correctly.
+  // Attempt to focus immediately
   jjuiTerminal.show(false);
 
-  vscode.window.onDidCloseTerminal((terminal) => {
-    if (terminal === jjuiTerminal) {
+  // The "First-Open" Fix:
+  // Poll for focus. This is cleaner than a fixed delay because it
+  // resolves as fast as the hardware allows (usually < 50ms).
+  let focusAttempts = 0;
+  const pollFocus = () => {
+    if (vscode.window.activeTerminal === jjuiTerminal) {
+      // Focus achieved!
+      return;
+    }
+    if (focusAttempts < 10) {
+      // Max 10 attempts (1 second total)
+      focusAttempts++;
+      vscode.commands.executeCommand("workbench.action.terminal.focus");
+      setTimeout(pollFocus, 100);
+    }
+  };
+
+  pollFocus();
+
+  vscode.window.onDidCloseTerminal((t) => {
+    if (t === jjuiTerminal) {
       jjuiTerminal = undefined;
       onHide();
     }
@@ -150,11 +167,13 @@ function focusWindow() {
 }
 
 function closeWindow() {
-  const openTabs = vscode.window.tabGroups.all.flatMap(g => g.tabs).length;
+  const openTabs = vscode.window.tabGroups.all.flatMap((g) => g.tabs).length;
   if (openTabs === 1 && jjuiTerminal) {
     jjuiTerminal.dispose();
   } else {
-    vscode.commands.executeCommand("workbench.action.openPreviousRecentlyUsedEditorInGroup");
+    vscode.commands.executeCommand(
+      "workbench.action.openPreviousRecentlyUsedEditorInGroup",
+    );
   }
 }
 
@@ -162,26 +181,36 @@ function closeWindow() {
 
 function onShown() {
   const shouldKeep = (behavior: PanelBehavior) => behavior === "keep";
-  const shouldHide = (behavior: PanelBehavior) => behavior === "hide" || behavior === "hideRestore";
+  const shouldHide = (behavior: PanelBehavior) =>
+    behavior === "hide" || behavior === "hideRestore";
 
   if (globalConfig.autoMaximizeWindow) {
-    vscode.commands.executeCommand("workbench.action.maximizeEditorHideSidebar");
+    vscode.commands.executeCommand(
+      "workbench.action.maximizeEditorHideSidebar",
+    );
     if (shouldKeep(globalConfig.panels.sidebar)) {
-      vscode.commands.executeCommand("workbench.action.toggleSidebarVisibility");
+      vscode.commands.executeCommand(
+        "workbench.action.toggleSidebarVisibility",
+      );
     }
   } else {
-    if (shouldHide(globalConfig.panels.sidebar)) vscode.commands.executeCommand("workbench.action.closeSidebar");
-    if (shouldHide(globalConfig.panels.secondarySidebar)) vscode.commands.executeCommand("workbench.action.closeAuxiliaryBar");
+    if (shouldHide(globalConfig.panels.sidebar))
+      vscode.commands.executeCommand("workbench.action.closeSidebar");
+    if (shouldHide(globalConfig.panels.secondarySidebar))
+      vscode.commands.executeCommand("workbench.action.closeAuxiliaryBar");
   }
 
-  if (shouldHide(globalConfig.panels.panel)) vscode.commands.executeCommand("workbench.action.closePanel");
+  if (shouldHide(globalConfig.panels.panel))
+    vscode.commands.executeCommand("workbench.action.closePanel");
 }
 
 function onHide() {
   const shouldRestore = (behavior: PanelBehavior) => behavior === "hideRestore";
   // if (shouldRestore(globalConfig.panels.sidebar)) vscode.commands.executeCommand("workbench.action.toggleSidebarVisibility");
-  if (shouldRestore(globalConfig.panels.secondarySidebar)) vscode.commands.executeCommand("workbench.action.toggleAuxiliaryBar");
-  if (shouldRestore(globalConfig.panels.panel)) vscode.commands.executeCommand("workbench.action.togglePanel");
+  if (shouldRestore(globalConfig.panels.secondarySidebar))
+    vscode.commands.executeCommand("workbench.action.toggleAuxiliaryBar");
+  if (shouldRestore(globalConfig.panels.panel))
+    vscode.commands.executeCommand("workbench.action.togglePanel");
 
   if (globalConfig.autoMaximizeWindow) {
     vscode.commands.executeCommand("workbench.action.evenEditorWidths");
@@ -196,21 +225,28 @@ function onHide() {
 
 function findExecutableOnPath(executable: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const command = process.platform === "win32" ? `where ${executable}` : `which ${executable}`;
+    const command =
+      process.platform === "win32"
+        ? `where ${executable}`
+        : `which ${executable}`;
     exec(command, (error, stdout) => {
       if (error) reject(new Error(`${executable} not found`));
-      else resolve(stdout.split('\r\n')[0].split('\n')[0].trim());
+      else resolve(stdout.split("\r\n")[0].split("\n")[0].trim());
     });
   });
 }
 
 function expandPath(pth: string): string {
   pth = pth.replace(/^~(?=$|\/|\\)/, os.homedir());
-  return pth.replace(/%([^%]+)%/g, (_, n) => process.env[n] || "").replace(/\$([A-Za-z0-9_]+)/g, (_, n) => process.env[n] || "");
+  return pth
+    .replace(/%([^%]+)%/g, (_, n) => process.env[n] || "")
+    .replace(/\$([A-Za-z0-9_]+)/g, (_, n) => process.env[n] || "");
 }
 
 function getWorkspaceFolder(): string {
   const activeDocumentUri = vscode.window.activeTextEditor?.document.uri;
-  const workspaceFolder = activeDocumentUri ? vscode.workspace.getWorkspaceFolder(activeDocumentUri) : vscode.workspace.workspaceFolders?.[0];
+  const workspaceFolder = activeDocumentUri
+    ? vscode.workspace.getWorkspaceFolder(activeDocumentUri)
+    : vscode.workspace.workspaceFolders?.[0];
   return workspaceFolder?.uri.fsPath ?? os.homedir();
 }
