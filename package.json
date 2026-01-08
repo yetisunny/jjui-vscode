@@ -1,8 +1,15 @@
 {
   "name": "jjuivscode",
-  "displayName": "jjuivscode",
-  "description": "Easily open jjui inside vscode",
-  "version": "0.0.4",
+  "displayName": "jjuivscode - Jujutsu VCS TUI",
+  "description": "Open the Jujutsu TUI jjui inside VSCode terminal",
+  "keywords": [
+    "jujutsu",
+    "jjui",
+    "tui",
+    "vscode",
+    "extension"
+  ],
+  "version": "0.0.5",
   "icon": "jjuivscodeloge.png",
   "publisher":"Yetisunny",
   "repository": {
