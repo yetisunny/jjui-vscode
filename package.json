@@ -2,8 +2,13 @@
   "name": "jjuivscode",
   "displayName": "jjuivscode",
   "description": "Easily open jjui inside vscode",
-  "version": "0.0.3",
+  "version": "0.0.4",
+  "icon": "jjuivscodeloge.png",
   "publisher":"Yetisunny",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yetisunny/jjui-vscode"
+},
   "engines": {
     "vscode": "^1.103.0"
   },
