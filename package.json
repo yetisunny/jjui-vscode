@@ -3,6 +3,7 @@
   "displayName": "jjuivscode",
   "description": "Easily open jjui inside vscode",
   "version": "0.0.3",
+  "publisher":"Yetisunny",
   "engines": {
     "vscode": "^1.103.0"
   },
